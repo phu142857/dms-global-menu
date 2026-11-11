@@ -1,0 +1,15 @@
+{
+  "$schema": "https://duxlabs.dev/schemas/plugin.json",
+  "id": "globalMenu",
+  "name": "Global Menu",
+  "description": "macOS-style application menu for DMS on Niri",
+  "version": "1.0.0",
+  "author": "phu142857",
+  "type": "widget",
+  "capabilities": ["dankbar-widget", "global-menu", "dbusmenu"],
+  "component": "./GlobalMenu.qml",
+  "icon": "menu",
+  "requires_dms": ">=2.0.0",
+  "dependencies": ["python", "python-dbus", "python-gobject", "niri"],
+  "permissions": ["process"]
+}

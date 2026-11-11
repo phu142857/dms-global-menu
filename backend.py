@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -148,12 +149,25 @@ class MenuBackend:
         if selected is None:
             selected = self.discover_gtk_menu(focus_pid)
             selected_kind = "gtk" if selected is not None else ""
+        if selected is None and str(self.focus.get("app_id") or "") in {"code", "code-oss", "cursor"}:
+            selected = self.discover_vscode_bridge(focus_pid)
+            selected_kind = "vscode" if selected is not None else ""
         if selected != self.active or selected_kind != self.active_kind:
             self._detach_menu()
             self.active = selected
             self.active_kind = selected_kind
             self._attach_menu()
         self.refresh()
+
+    @staticmethod
+    def discover_vscode_bridge(focus_pid: int) -> Registration | None:
+        if not focus_pid:
+            return None
+        runtime_dir = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
+        bridge = runtime_dir / f"dms-global-menu-vscode-{focus_pid}.sock"
+        if bridge.is_socket():
+            return Registration(-1000, "vscode", str(bridge), focus_pid)
+        return None
 
     def discover_gtk_menu(self, focus_pid: int) -> Registration | None:
         """Find appmenu-gtk-module's native Wayland export for a process."""
@@ -229,6 +243,8 @@ class MenuBackend:
     def _attach_menu(self) -> None:
         if self.active is None:
             return
+        if self.active_kind == "vscode":
+            return
         try:
             obj = self.bus.get_object(self.active.sender, self.active.path)
             if self.active_kind == "gtk":
@@ -254,6 +270,11 @@ class MenuBackend:
         return False
 
     def refresh(self) -> None:
+        if self.active_kind == "vscode" and self.active is not None:
+            self.revision += 1
+            self.tokens.clear()
+            self.write_state("ready", self.read_vscode_menu())
+            return
         if self.active_interface is None:
             self.tokens.clear()
             self.write_state("unsupported", [])
@@ -271,6 +292,80 @@ class MenuBackend:
         except dbus.DBusException as error:
             log(f"GetLayout failed: {error}")
             self.write_state("error", [])
+
+    def read_vscode_menu(self) -> list[dict[str, Any]]:
+        definitions = [
+            ("File", [
+                ("New Text File", "workbench.action.files.newUntitledFile"),
+                ("Open File…", "workbench.action.files.openFile"),
+                ("Open Folder…", "workbench.action.files.openFolder"),
+                ("Save", "workbench.action.files.save"),
+                ("Save As…", "workbench.action.files.saveAs"),
+                ("Close Editor", "workbench.action.closeActiveEditor"),
+            ]),
+            ("Edit", [
+                ("Undo", "undo"), ("Redo", "redo"),
+                ("Cut", "editor.action.clipboardCutAction"),
+                ("Copy", "editor.action.clipboardCopyAction"),
+                ("Paste", "editor.action.clipboardPasteAction"),
+                ("Find", "actions.find"),
+                ("Replace", "editor.action.startFindReplaceAction"),
+            ]),
+            ("Selection", [
+                ("Select All", "editor.action.selectAll"),
+                ("Expand Selection", "editor.action.smartSelect.expand"),
+                ("Shrink Selection", "editor.action.smartSelect.shrink"),
+                ("Copy Line Up", "editor.action.copyLinesUpAction"),
+                ("Copy Line Down", "editor.action.copyLinesDownAction"),
+            ]),
+            ("View", [
+                ("Command Palette…", "workbench.action.showCommands"),
+                ("Explorer", "workbench.view.explorer"),
+                ("Search", "workbench.view.search"),
+                ("Extensions", "workbench.view.extensions"),
+                ("Toggle Primary Side Bar", "workbench.action.toggleSidebarVisibility"),
+                ("Toggle Panel", "workbench.action.togglePanel"),
+            ]),
+            ("Go", [
+                ("Back", "workbench.action.navigateBack"),
+                ("Forward", "workbench.action.navigateForward"),
+                ("Go to File…", "workbench.action.quickOpen"),
+                ("Go to Symbol…", "workbench.action.gotoSymbol"),
+                ("Go to Line…", "workbench.action.gotoLine"),
+            ]),
+            ("Run", [
+                ("Start Debugging", "workbench.action.debug.start"),
+                ("Run Without Debugging", "workbench.action.debug.run"),
+                ("Stop Debugging", "workbench.action.debug.stop"),
+                ("Restart Debugging", "workbench.action.debug.restart"),
+            ]),
+            ("Terminal", [
+                ("New Terminal", "workbench.action.terminal.new"),
+                ("Split Terminal", "workbench.action.terminal.split"),
+                ("Kill Terminal", "workbench.action.terminal.kill"),
+                ("Toggle Terminal", "workbench.action.terminal.toggleTerminal"),
+            ]),
+            ("Help", [
+                ("Welcome", "workbench.action.openWalkthrough"),
+                ("Show All Commands", "workbench.action.showCommands"),
+                ("Keyboard Shortcuts", "workbench.action.openGlobalKeybindings"),
+                ("About", "workbench.action.showAboutDialog"),
+            ]),
+        ]
+
+        def item(label: str, command: str) -> dict[str, Any]:
+            token = f"{self.revision}:vscode:{len(self.tokens)}"
+            self.tokens[token] = command
+            return {"label": label, "enabled": True, "visible": True,
+                    "separator": False, "toggle_state": False,
+                    "toggle_type": "", "token": token, "children": []}
+
+        return [
+            {"label": label, "enabled": True, "visible": True,
+             "separator": False, "toggle_state": False, "toggle_type": "",
+             "token": "", "children": [item(child_label, command) for child_label, command in children]}
+            for label, children in definitions
+        ]
 
     def parse_item(self, raw: Any) -> dict[str, Any]:
         item_id = int(raw[0])
@@ -359,7 +454,20 @@ class MenuBackend:
 
     def activate(self, token: str) -> bool:
         action = self.tokens.get(token)
-        if action is None or self.active_interface is None:
+        if action is None:
+            return False
+        if self.active_kind == "vscode" and self.active is not None:
+            try:
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+                    connection.settimeout(2)
+                    connection.connect(self.active.path)
+                    connection.sendall((json.dumps({"command": action}) + "\n").encode("utf-8"))
+                    response = json.loads(connection.makefile("r", encoding="utf-8").readline())
+                return bool(response.get("ok"))
+            except (OSError, ValueError, json.JSONDecodeError) as error:
+                log(f"VS Code bridge activation failed command={action}: {error}")
+                return False
+        if self.active_interface is None:
             return False
         try:
             if self.active_kind == "gtk":

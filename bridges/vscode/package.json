@@ -1,0 +1,20 @@
+{
+  "name": "dms-global-menu-bridge",
+  "displayName": "DMS Global Menu Bridge",
+  "description": "Executes menu commands requested by the DMS Global Menu plugin.",
+  "version": "1.1.0",
+  "publisher": "phu142857",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/phu142857/dms-global-menu.git",
+    "directory": "bridges/vscode"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "files": ["extension.js", "package.json", "README.md", "LICENSE"]
+}

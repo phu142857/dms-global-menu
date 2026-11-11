@@ -44,6 +44,29 @@ ID. Applications that do not export either D-Bus protocol keep their in-window
 menu; the widget shows only the application name and never borrows another
 application's menu.
 
+### Code - OSS and Cursor
+
+Electron does not export its application menu through the Linux D-Bus menu
+protocols when running natively on Wayland. Install the bundled companion
+extension to expose menu commands over a local Unix socket:
+
+```sh
+code-oss --install-extension \
+  ~/.config/dms/plugins/globalMenu/dist/dms-global-menu-bridge-1.1.0.vsix --force
+cursor --install-extension \
+  ~/.config/dms/plugins/globalMenu/dist/dms-global-menu-bridge-1.1.0.vsix --force
+```
+
+Reload the editor window after installation. The bridge has no network access,
+does not collect telemetry, and does not read editor contents.
+
+### Zen Browser
+
+Zen/Firefox on native Wayland currently exports neither a D-Bus application
+menu nor a sufficiently labelled browser-chrome accessibility tree. The plugin
+therefore shows the Zen application name only instead of presenting broken or
+mislabelled menu actions.
+
 ## License
 
 MIT

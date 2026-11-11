@@ -163,7 +163,9 @@ PluginComponent {
                         : (root.menuState.app_name || "Global Menu")
             detailsText: root.menuState.status === "ready"
                          ? (root.selectedTopMenu.label || "Application menu")
-                         : "Ứng dụng này chưa xuất menu D-Bus"
+                         : root.menuState.status === "fallback"
+                           ? "Menu cửa sổ — ứng dụng không xuất menu gốc"
+                           : "Ứng dụng này chưa xuất menu D-Bus"
 
             Column {
                 width: parent.width

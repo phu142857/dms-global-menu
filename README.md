@@ -41,8 +41,13 @@ The backend supports both Canonical `com.canonical.dbusmenu` registrations and
 native Wayland `org.gtk.Menus`/`org.gtk.Actions` exports from
 `appmenu-gtk-module`. GTK 3 applications work without relying on an X11 window
 ID. Applications that do not export either D-Bus protocol keep their in-window
-menu; the widget shows only the application name and never borrows another
-application's menu.
+menu and receive a safe fallback with Niri window and workspace actions. The
+plugin never borrows another application's menu or invents unavailable
+application actions.
+
+This gives every focused window a useful menu while preserving native menus
+where applications expose them. A true application menu still requires an API
+from the application or its toolkit.
 
 ### Code - OSS and Cursor
 
@@ -64,8 +69,9 @@ does not collect telemetry, and does not read editor contents.
 
 Zen/Firefox on native Wayland currently exports neither a D-Bus application
 menu nor a sufficiently labelled browser-chrome accessibility tree. The plugin
-therefore shows the Zen application name only instead of presenting broken or
-mislabelled menu actions.
+therefore provides the universal Window/Workspace fallback instead of
+presenting broken or mislabelled browser actions. Native tab/history actions
+would require a signed Firefox WebExtension and a native-messaging bridge.
 
 ## License
 

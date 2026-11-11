@@ -103,6 +103,7 @@ class MenuBackend:
         self.signal_matches: list[Any] = []
         self.tokens: dict[str, Any] = {}
         self.revision = 0
+        self.last_status = "starting"
         self._refresh_source = 0
         self._event_process: subprocess.Popen[str] | None = None
         self.write_state("starting", [])
@@ -132,7 +133,20 @@ class MenuBackend:
             self.choose_active()
 
     def set_focus(self, window: dict[str, Any] | None) -> None:
-        self.focus = window or {}
+        updated = window or {}
+        old_key = (self.focus.get("id"), self.focus.get("pid"), self.focus.get("app_id"), self.focus.get("title"))
+        new_key = (updated.get("id"), updated.get("pid"), updated.get("app_id"), updated.get("title"))
+        self.focus = updated
+        if old_key == new_key:
+            app_id = str(updated.get("app_id") or "")
+            focus_pid = int(updated.get("pid") or 0)
+            if (
+                self.active_kind == "fallback"
+                and app_id in {"code", "code-oss", "cursor"}
+                and self.discover_vscode_bridge(focus_pid) is not None
+            ):
+                self.choose_active()
+            return
         self.choose_active()
 
     def choose_active(self) -> None:
@@ -152,7 +166,13 @@ class MenuBackend:
         if selected is None and str(self.focus.get("app_id") or "") in {"code", "code-oss", "cursor"}:
             selected = self.discover_vscode_bridge(focus_pid)
             selected_kind = "vscode" if selected is not None else ""
+        if selected is None:
+            selected_kind = "fallback"
         if selected != self.active or selected_kind != self.active_kind:
+            log(
+                f"active app={self.focus.get('app_id', '')} pid={focus_pid} "
+                f"kind={selected_kind} sender={selected.sender if selected else '-'}"
+            )
             self._detach_menu()
             self.active = selected
             self.active_kind = selected_kind
@@ -270,6 +290,11 @@ class MenuBackend:
         return False
 
     def refresh(self) -> None:
+        if self.active_kind == "fallback":
+            self.revision += 1
+            self.tokens.clear()
+            self.write_state("fallback", self.read_fallback_menu())
+            return
         if self.active_kind == "vscode" and self.active is not None:
             self.revision += 1
             self.tokens.clear()
@@ -288,10 +313,44 @@ class MenuBackend:
                 _revision, layout = self.active_interface.GetLayout(0, -1, dbus.Array([], signature="s"), timeout=2)
                 root = self.parse_item(layout)
                 menus = [item for item in root.get("children", []) if item.get("visible", True) and not item.get("separator")]
-            self.write_state("ready" if menus else "unsupported", menus)
+            if menus:
+                self.write_state("ready", menus)
+            else:
+                self.tokens.clear()
+                self.write_state("fallback", self.read_fallback_menu())
         except dbus.DBusException as error:
             log(f"GetLayout failed: {error}")
             self.write_state("error", [])
+
+    def read_fallback_menu(self) -> list[dict[str, Any]]:
+        """Expose safe compositor actions when an app has no menu protocol."""
+        definitions = [
+            ("Window", [
+                ("Toggle Full Screen", "fullscreen-window"),
+                ("Maximize / Restore", "maximize-window-to-edges"),
+                ("Center", "center-window"),
+                ("Float / Tile", "toggle-window-floating"),
+                ("Close", "close-window"),
+            ]),
+            ("Workspace", [
+                ("Move to Previous Workspace", "move-window-to-workspace-up"),
+                ("Move to Next Workspace", "move-window-to-workspace-down"),
+            ]),
+        ]
+
+        def item(label: str, action: str) -> dict[str, Any]:
+            token = f"{self.revision}:niri:{len(self.tokens)}"
+            self.tokens[token] = {"kind": "niri", "action": action}
+            return {"label": label, "enabled": True, "visible": True,
+                    "separator": False, "toggle_state": False,
+                    "toggle_type": "", "token": token, "children": []}
+
+        return [
+            {"label": label, "enabled": True, "visible": True,
+             "separator": False, "toggle_state": False, "toggle_type": "",
+             "token": "", "children": [item(child_label, action) for child_label, action in children]}
+            for label, children in definitions
+        ]
 
     def read_vscode_menu(self) -> list[dict[str, Any]]:
         definitions = [
@@ -456,6 +515,28 @@ class MenuBackend:
         action = self.tokens.get(token)
         if action is None:
             return False
+        if isinstance(action, dict) and action.get("kind") == "niri":
+            window_id = int(self.focus.get("id") or 0)
+            niri_action = str(action.get("action") or "")
+            allowed = {
+                "fullscreen-window", "maximize-window-to-edges", "center-window",
+                "toggle-window-floating", "close-window",
+                "move-window-to-workspace-up", "move-window-to-workspace-down",
+            }
+            if not window_id or niri_action not in allowed:
+                return False
+            try:
+                subprocess.run(
+                    ["niri", "msg", "action", "focus-window", "--id", str(window_id)],
+                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2,
+                )
+                subprocess.run(
+                    ["niri", "msg", "action", niri_action],
+                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2,
+                )
+                return True
+            except (OSError, subprocess.SubprocessError):
+                return False
         if self.active_kind == "vscode" and self.active is not None:
             try:
                 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
@@ -483,6 +564,7 @@ class MenuBackend:
             return False
 
     def write_state(self, status: str, menus: list[dict[str, Any]]) -> None:
+        self.last_status = status
         app_id = str(self.focus.get("app_id") or "")
         title = str(self.focus.get("title") or "")
         state = {
@@ -522,6 +604,10 @@ class MenuBackend:
             self.set_focus(None)
 
     def start_niri_watcher(self) -> None:
+        def poll() -> bool:
+            self.query_focus()
+            return True
+
         def watch() -> None:
             while True:
                 try:
@@ -541,6 +627,7 @@ class MenuBackend:
                 time.sleep(1)
 
         self.query_focus()
+        GLib.timeout_add_seconds(1, poll)
         threading.Thread(target=watch, name="niri-global-menu", daemon=True).start()
 
 

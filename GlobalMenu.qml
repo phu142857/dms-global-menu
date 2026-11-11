@@ -97,7 +97,7 @@ PluginComponent {
 
             Item {
                 height: parent.height
-                width: appLabel.implicitWidth + Theme.spacingM * 2
+                width: appLabel.implicitWidth + 24
 
                 StyledText {
                     id: appLabel
@@ -105,7 +105,8 @@ PluginComponent {
                     text: root.menuState.app_name || "Desktop"
                     color: Theme.surfaceText
                     font.pixelSize: root.textSize
-                    font.weight: Font.DemiBold
+                    font.family: "Inter"
+                    font.weight: Font.Bold
                     elide: Text.ElideRight
                     width: Math.min(implicitWidth, 180)
                 }
@@ -118,13 +119,15 @@ PluginComponent {
                     required property var modelData
                     required property int index
                     height: menuRow.height
-                    width: menuLabel.implicitWidth + Theme.spacingM * 2
+                    width: menuLabel.implicitWidth + 20
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: Theme.cornerRadius
+                        anchors.topMargin: 3
+                        anchors.bottomMargin: 3
+                        radius: 5
                         color: menuMouse.containsMouse || root.selectedMenu === index && root.interactionActive
-                               ? Theme.chipSurface : "transparent"
+                               ? Theme.withAlpha(Theme.surfaceText, 0.12) : "transparent"
                     }
 
                     StyledText {
@@ -133,6 +136,8 @@ PluginComponent {
                         text: modelData.label || ""
                         color: Theme.surfaceText
                         font.pixelSize: root.textSize
+                        font.family: "Inter"
+                        font.weight: Font.Normal
                     }
 
                     MouseArea {
@@ -164,8 +169,8 @@ PluginComponent {
             detailsText: root.menuState.status === "ready"
                          ? (root.selectedTopMenu.label || "Application menu")
                          : root.menuState.status === "fallback"
-                           ? "Menu cửa sổ — ứng dụng không xuất menu gốc"
-                           : "Ứng dụng này chưa xuất menu D-Bus"
+                           ? "Window controls for apps without a native menu"
+                           : "This app does not provide a native menu"
 
             Column {
                 width: parent.width
@@ -174,9 +179,9 @@ PluginComponent {
                 Rectangle {
                     visible: root.navigation.length > 0
                     width: parent.width
-                    height: visible ? 38 : 0
-                    radius: Theme.cornerRadius
-                    color: backMouse.containsMouse ? Theme.chipSurface : "transparent"
+                    height: visible ? 32 : 0
+                    radius: 5
+                    color: backMouse.containsMouse ? Theme.withAlpha(Theme.surfaceText, 0.10) : "transparent"
 
                     Row {
                         anchors.verticalCenter: parent.verticalCenter
@@ -189,9 +194,10 @@ PluginComponent {
                         }
 
                         StyledText {
-                            text: "Quay lại"
+                            text: "Back"
                             color: Theme.surfaceText
-                            font.pixelSize: Theme.fontSizeMedium
+                            font.pixelSize: 13
+                            font.family: "Inter"
                         }
                     }
 
@@ -211,7 +217,7 @@ PluginComponent {
                         required property var modelData
                         required property int index
                         width: parent.width
-                        height: modelData.separator ? 9 : 38
+                        height: modelData.separator ? 9 : 32
                         visible: modelData.visible !== false
 
                         Rectangle {
@@ -226,9 +232,11 @@ PluginComponent {
                         Rectangle {
                             visible: modelData.separator !== true
                             anchors.fill: parent
-                            radius: Theme.cornerRadius
+                            anchors.leftMargin: 5
+                            anchors.rightMargin: 5
+                            radius: 5
                             color: itemMouse.containsMouse && modelData.enabled !== false
-                                   ? Theme.chipSurface : "transparent"
+                                   ? Theme.primary : "transparent"
                             opacity: modelData.enabled === false ? 0.45 : 1
 
                             Row {
@@ -241,24 +249,29 @@ PluginComponent {
                                     anchors.verticalCenter: parent.verticalCenter
                                     width: 18
                                     text: modelData.toggle_state ? "✓" : ""
-                                    color: Theme.primary
-                                    font.pixelSize: Theme.fontSizeMedium
+                                    color: itemMouse.containsMouse ? Theme.primaryText : Theme.primary
+                                    font.pixelSize: 13
+                                    font.family: "Inter"
                                 }
 
                                 StyledText {
                                     anchors.verticalCenter: parent.verticalCenter
                                     width: parent.width - 44
                                     text: modelData.label || ""
-                                    color: Theme.surfaceText
-                                    font.pixelSize: Theme.fontSizeMedium
+                                    color: itemMouse.containsMouse && modelData.enabled !== false
+                                           ? Theme.primaryText : Theme.surfaceText
+                                    font.pixelSize: 13
+                                    font.family: "Inter"
                                     elide: Text.ElideRight
                                 }
 
                                 StyledText {
                                     anchors.verticalCenter: parent.verticalCenter
                                     text: modelData.children && modelData.children.length > 0 ? "›" : ""
-                                    color: Theme.surfaceText
-                                    font.pixelSize: Theme.fontSizeLarge
+                                    color: itemMouse.containsMouse && modelData.enabled !== false
+                                           ? Theme.primaryText : Theme.surfaceText
+                                    font.pixelSize: 16
+                                    font.family: "Inter"
                                 }
                             }
 
@@ -283,14 +296,15 @@ PluginComponent {
                     visible: root.visibleItems.length === 0
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
-                    text: root.menuState.status === "starting" ? "Đang khởi động…" : "Không có mục menu"
+                    text: root.menuState.status === "starting" ? "Starting…" : "No Menu Items"
                     color: Theme.surfaceVariantText
-                    font.pixelSize: Theme.fontSizeMedium
+                    font.pixelSize: 13
+                    font.family: "Inter"
                 }
             }
         }
     }
 
-    popoutWidth: 330
-    popoutHeight: Math.min(620, 150 + visibleItems.length * 40)
+    popoutWidth: 300
+    popoutHeight: Math.min(560, 132 + visibleItems.length * 34)
 }

@@ -327,14 +327,12 @@ class MenuBackend:
         definitions = [
             ("Window", [
                 ("Toggle Full Screen", "fullscreen-window"),
-                ("Maximize / Restore", "maximize-window-to-edges"),
-                ("Center", "center-window"),
-                ("Float / Tile", "toggle-window-floating"),
-                ("Close", "close-window"),
-            ]),
-            ("Workspace", [
-                ("Move to Previous Workspace", "move-window-to-workspace-up"),
-                ("Move to Next Workspace", "move-window-to-workspace-down"),
+                ("Zoom", "maximize-window-to-edges"),
+                ("Center Window", "center-window"),
+                ("Float or Tile Window", "toggle-window-floating"),
+                ("Move to Previous Space", "move-window-to-workspace-up"),
+                ("Move to Next Space", "move-window-to-workspace-down"),
+                ("Close Window", "close-window"),
             ]),
         ]
 

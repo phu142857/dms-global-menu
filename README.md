@@ -4,6 +4,9 @@ A macOS-style application menu widget for Dux Modular Shell (DMS) on Niri.
 It implements the standard `com.canonical.AppMenu.Registrar` protocol, follows
 Niri's focused window, and activates real application menu actions.
 
+The interface uses English labels throughout, compact macOS-like menu density,
+bold active-application typography, and standard Window/Space terminology.
+
 ## Requirements
 
 - DMS 2.0 or newer

@@ -22,6 +22,7 @@ PluginComponent {
     property string statePath: StandardPaths.writableLocation(StandardPaths.GenericCacheLocation) + "/dms/global-menu/state.json"
     readonly property var topMenus: menuState.menus || []
     readonly property var selectedTopMenu: topMenus.length > selectedMenu ? topMenus[selectedMenu] : ({ "children": [] })
+    readonly property bool menuPopoutActive: anchoredMenuPopout.shouldBeVisible
     readonly property var visibleItems: {
         var node = selectedTopMenu;
         for (var i = 0; i < navigation.length; i++) {
@@ -40,17 +41,46 @@ PluginComponent {
         Quickshell.execDetached(command);
     }
 
-    function openMenu(index) {
+    function openMenu(index, anchorItem) {
         selectedMenu = index;
         navigation = [];
-        triggerPopout();
+        surfaceContext?.ensureVisible(root);
+        const itemAnchor = surfaceContext?.popupAnchor(anchorItem, section);
+        if (itemAnchor) {
+            // DPopout normally centres itself on the trigger. Shift the
+            // trigger so the popout's left edge lines up with the clicked
+            // top-level menu, matching the macOS menu bar.
+            const leftAlignedX = itemAnchor.trigger.x
+                               + (root.popoutWidth - itemAnchor.trigger.width) / 2;
+            anchoredMenuPopout.setTriggerPosition(
+                leftAlignedX, itemAnchor.trigger.y, itemAnchor.trigger.width,
+                itemAnchor.section, itemAnchor.screen, itemAnchor.position,
+                itemAnchor.thickness, itemAnchor.spacing, itemAnchor.config,
+                anchorItem);
+            PopoutManager.requestPopout(anchoredMenuPopout, undefined,
+                                         popoutTriggerId + ":" + index);
+            return;
+        }
+
+        const fallbackAnchor = pillAnchor();
+        if (!fallbackAnchor)
+            return;
+        const fallbackX = fallbackAnchor.trigger.x
+                        + (root.popoutWidth - fallbackAnchor.trigger.width) / 2;
+        anchoredMenuPopout.setTriggerPosition(
+            fallbackX, fallbackAnchor.trigger.y,
+            fallbackAnchor.trigger.width, section, fallbackAnchor.screen,
+            fallbackAnchor.position, fallbackAnchor.thickness,
+            fallbackAnchor.spacing, fallbackAnchor.config, root);
+        PopoutManager.requestPopout(anchoredMenuPopout, undefined,
+                                     popoutTriggerId + ":" + index);
     }
 
     function activate(item) {
         if (!item || item.enabled === false || !item.token)
             return;
         runBackend(["activate", item.token]);
-        closePopout();
+        anchoredMenuPopout.close();
     }
 
     Component.onCompleted: {
@@ -126,7 +156,7 @@ PluginComponent {
                         anchors.topMargin: 3
                         anchors.bottomMargin: 3
                         radius: 5
-                        color: menuMouse.containsMouse || root.selectedMenu === index && root.interactionActive
+                        color: menuMouse.containsMouse || root.selectedMenu === index && root.menuPopoutActive
                                ? Theme.withAlpha(Theme.surfaceText, 0.12) : "transparent"
                     }
 
@@ -145,7 +175,7 @@ PluginComponent {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.openMenu(index)
+                        onClicked: root.openMenu(index, menuMouse)
                     }
                 }
             }
@@ -160,7 +190,9 @@ PluginComponent {
         }
     }
 
-    popoutContent: Component {
+    popoutContent: null
+
+    property Component anchoredMenuContent: Component {
         PopoutComponent {
             id: menuPopout
             headerText: ""
@@ -297,6 +329,14 @@ PluginComponent {
                 }
             }
         }
+    }
+
+    PluginPopout {
+        id: anchoredMenuPopout
+        pluginId: root.pluginId
+        contentWidth: root.popoutWidth
+        contentHeight: root.popoutHeight
+        pluginContent: root.anchoredMenuContent
     }
 
     popoutWidth: 300

@@ -155,7 +155,7 @@ PluginComponent {
                         anchors.fill: parent
                         anchors.topMargin: 3
                         anchors.bottomMargin: 3
-                        radius: 5
+                        radius: 8
                         color: menuMouse.containsMouse || root.selectedMenu === index && root.menuPopoutActive
                                ? Theme.withAlpha(Theme.surfaceText, 0.12) : "transparent"
                     }
@@ -206,7 +206,7 @@ PluginComponent {
                     visible: root.navigation.length > 0
                     width: parent.width
                     height: visible ? 32 : 0
-                    radius: 5
+                    radius: 8
                     color: backMouse.containsMouse ? Theme.withAlpha(Theme.surfaceText, 0.10) : "transparent"
 
                     Row {
@@ -260,7 +260,7 @@ PluginComponent {
                             anchors.fill: parent
                             anchors.leftMargin: 5
                             anchors.rightMargin: 5
-                            radius: 5
+                            radius: 8
                             color: itemMouse.containsMouse && modelData.enabled !== false
                                    ? Theme.primary : "transparent"
                             opacity: modelData.enabled === false ? 0.45 : 1

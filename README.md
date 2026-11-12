@@ -6,6 +6,8 @@ Niri's focused window, and activates real application menu actions.
 
 The interface uses English labels throughout, compact macOS-like menu density,
 bold active-application typography, and standard Window/Space terminology.
+Layer-shell popouts preserve the last real application focus, preventing an
+open menu from switching to the Desktop fallback.
 
 ## Requirements
 

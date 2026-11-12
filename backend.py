@@ -597,9 +597,34 @@ class MenuBackend:
                 stderr=subprocess.DEVNULL,
                 timeout=2,
             )
-            self.set_focus(json.loads(result.stdout))
-        except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+            focused = json.loads(result.stdout)
+            if isinstance(focused, dict) and focused.get("id"):
+                self.set_focus(focused)
+                return
+
+            # Layer-shell popouts (including this plugin's menu) temporarily
+            # take keyboard focus, making Niri report no focused window. Keep
+            # the previous application while its window still exists so an
+            # open menu cannot turn into the Desktop fallback mid-click.
+            previous_id = int(self.focus.get("id") or 0)
+            if previous_id:
+                windows_result = subprocess.run(
+                    ["niri", "msg", "--json", "windows"],
+                    check=True,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    timeout=2,
+                )
+                windows = json.loads(windows_result.stdout)
+                if any(int(window.get("id") or 0) == previous_id for window in windows):
+                    return
             self.set_focus(None)
+        except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+            # A transient IPC failure must not replace a valid application
+            # menu with Desktop. The next event/poll retries automatically.
+            if not self.focus:
+                self.set_focus(None)
 
     def start_niri_watcher(self) -> None:
         def poll() -> bool:

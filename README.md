@@ -6,6 +6,7 @@ Niri's focused window, and activates real application menu actions.
 
 The interface uses English labels throughout, compact macOS-like menu density,
 bold active-application typography, and standard Window/Space terminology.
+Menu popouts are headerless, matching macOS by opening directly on commands.
 Layer-shell popouts preserve the last real application focus, preventing an
 open menu from switching to the Desktop fallback.
 

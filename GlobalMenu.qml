@@ -163,14 +163,8 @@ PluginComponent {
     popoutContent: Component {
         PopoutComponent {
             id: menuPopout
-            headerText: root.navigation.length > 0
-                        ? (root.selectedTopMenu.label || "Menu")
-                        : (root.menuState.app_name || "Global Menu")
-            detailsText: root.menuState.status === "ready"
-                         ? (root.selectedTopMenu.label || "Application menu")
-                         : root.menuState.status === "fallback"
-                           ? "Window controls for apps without a native menu"
-                           : "This app does not provide a native menu"
+            headerText: ""
+            detailsText: ""
 
             Column {
                 width: parent.width
@@ -306,5 +300,6 @@ PluginComponent {
     }
 
     popoutWidth: 300
-    popoutHeight: Math.min(560, 132 + visibleItems.length * 34)
+    popoutHeight: Math.max(64, Math.min(560, 16 + visibleItems.length * 34
+                                       + (navigation.length > 0 ? 34 : 0)))
 }
